@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stop! (Tutti Frutti) - Frontend
+
+A real-time multiplayer word game built with Next.js and Socket.IO.
+
+## Features
+
+- 🎮 Real-time multiplayer gameplay
+- 🏠 Room creation and joining with unique codes
+- 💬 In-game chat
+- 📊 Live scoreboard
+- 🎯 Customizable categories and rounds
+- 🌙 Dark mode support
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **State Management**: Zustand
+- **Real-time**: Socket.IO Client
+- **Styling**: Tailwind CSS
+- **Language**: TypeScript
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- pnpm (recommended)
+- Backend server running (see backend README)
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Install dependencies
+pnpm install
+
+# Copy environment file
+cp .env.example .env.local
+
+# Update NEXT_PUBLIC_SOCKET_URL if needed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start the development server
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
+
+### Production Build
+
+```bash
+pnpm build
+pnpm start
+```
+
+## Project Structure
+
+```
+frontend/
+├── app/                    # Next.js App Router pages
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Main game page
+│   └── globals.css        # Global styles
+├── components/
+│   ├── ui/                # Reusable UI components
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   ├── Card.tsx
+│   │   └── Badge.tsx
+│   ├── game/              # Game-specific components
+│   │   ├── PlayerList.tsx
+│   │   ├── ChatBox.tsx
+│   │   ├── GameSettings.tsx
+│   │   └── StopGameBoard.tsx
+│   └── views/             # Page views
+│       ├── HomeView.tsx
+│       ├── LobbyView.tsx
+│       └── GameView.tsx
+├── lib/
+│   ├── socket/            # Socket.IO configuration
+│   │   ├── socket.ts      # Socket singleton
+│   │   ├── useSocket.ts   # Socket hook
+│   │   └── constants.ts   # Event names
+│   ├── store/             # Zustand store
+│   │   └── game.store.ts
+│   └── types/             # TypeScript types
+│       └── game.types.ts
+└── .env.local             # Environment variables
+```
+
+## Game Flow
+
+1. **Home Screen**: Create or join a room
+2. **Lobby**: Wait for players, configure game settings
+3. **Game**: Answer categories with the given letter
+4. **Stop**: Press STOP when done, submit answers
+5. **Results**: See scores and continue to next round
+
+## Socket Events
+
+### Client → Server
+- `createRoom` - Create a new game room
+- `joinRoom` - Join existing room
+- `leaveRoom` - Leave current room
+- `playerReady` - Toggle ready status
+- `startGame` - Start the game (host only)
+- `gameAction` - Send game actions
+- `chatMessage` - Send chat message
+
+### Server → Client
+- `connected` - Connection established
+- `playerJoined` - Player joined room
+- `playerLeft` - Player left room
+- `gameStarted` - Game has started
+- `gameActionReceived` - Game action from another player
+- `chatMessageReceived` - Chat message received
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_SOCKET_URL` | Backend WebSocket URL | `http://localhost:3001` |
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Socket.IO Client](https://socket.io/docs/v4/client-api/)
+- [Zustand](https://github.com/pmndrs/zustand)
+- [Tailwind CSS](https://tailwindcss.com/docs)
