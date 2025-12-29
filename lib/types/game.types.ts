@@ -30,8 +30,8 @@ export interface StopGameState {
   categories: string[];
   roundStartTime: number;
   roundEndTime?: number;
-  playerAnswers: Map<string, PlayerAnswers>;
-  scores: Map<string, number>;
+  playerAnswers: Record<string, PlayerAnswers>;
+  scores: Record<string, number>;
   phase: GamePhase;
   stoppedBy?: string;
 }

@@ -15,6 +15,8 @@ export const GameView = ({ onGameEnd }: GameViewProps) => {
   const stopGameState = useGameStore((state) => state.stopGameState);
   const { resetRoom, leaveRoom, endGame } = useSocket();
 
+  console.log(stopGameState)
+
   const handleEndGame = async () => {
     try {
       await endGame();
@@ -82,7 +84,7 @@ export const GameView = ({ onGameEnd }: GameViewProps) => {
                 {room.players
                   .map((player) => ({
                     ...player,
-                    score: stopGameState?.scores.get(player.id) ?? 0,
+                    score: stopGameState?.scores?.[player.id] ?? 0
                   }))
                   .sort((a, b) => b.score - a.score)
                   .map((player, index) => (

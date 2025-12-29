@@ -69,8 +69,8 @@ const initialStopGameState: StopGameState = {
   totalRounds: 5,
   categories: DEFAULT_CATEGORIES.slice(0, 5),
   roundStartTime: 0,
-  playerAnswers: new Map(),
-  scores: new Map(),
+  playerAnswers: {},
+  scores: {},
   phase: GamePhase.IDLE,
 };
 
@@ -95,10 +95,7 @@ export const useGameStore = create<GameState>()(
       // Actions
       setPlayerId: (id) => set({ playerId: id }),
 
-      setRoom: (room) => {
-        console.log('🏠 setRoom called with:', room);
-        set({ room });
-      },
+      setRoom: (room) => set({ room }),
 
       addPlayer: (player) =>
         set((state) => {
@@ -191,16 +188,17 @@ export const useGameStore = create<GameState>()(
             const data = payload as { playerId: string; answers: Record<string, string> };
             set((state) => {
               if (!state.stopGameState) return state;
-              const newPlayerAnswers = new Map(state.stopGameState.playerAnswers);
-              newPlayerAnswers.set(data.playerId, {
-                playerId: data.playerId,
-                answers: data.answers,
-                submittedAt: Date.now(),
-              });
               return {
                 stopGameState: {
                   ...state.stopGameState,
-                  playerAnswers: newPlayerAnswers,
+                  playerAnswers: {
+                    ...state.stopGameState.playerAnswers,
+                    [data.playerId]: {
+                      playerId: data.playerId,
+                      answers: data.answers,
+                      submittedAt: Date.now(),
+                    },
+                  },
                 },
               };
             });
@@ -217,7 +215,7 @@ export const useGameStore = create<GameState>()(
                     currentLetter: data.letter,
                     roundStartTime: Date.now(),
                     phase: GamePhase.ROUND_ACTIVE,
-                    playerAnswers: new Map(),
+                    playerAnswers: {},
                     stoppedBy: undefined,
                     roundEndTime: undefined,
                   }
@@ -248,24 +246,26 @@ export const useGameStore = create<GameState>()(
 
       // Stop game specific
       initStopGame: (categories, totalRounds) => {
+        const scores: Record<string, number> = {};
+        
+        // Initialize scores for all players
+        const room = get().room;
+        if (room) {
+          room.players.forEach(player => {
+            scores[player.id] = 0;
+          });
+        }
+        
         const initialState: StopGameState = {
           currentLetter: '',
           currentRound: 0,
           totalRounds,
           categories,
           roundStartTime: 0,
-          playerAnswers: new Map(),
-          scores: new Map(),
+          playerAnswers: {},
+          scores,
           phase: GamePhase.IDLE,
         };
-        
-        // Initialize scores for all players
-        const room = get().room;
-        if (room) {
-          room.players.forEach(player => {
-            initialState.scores.set(player.id, 0);
-          });
-        }
         
         set({ stopGameState: initialState });
         return initialState;
@@ -285,7 +285,7 @@ export const useGameStore = create<GameState>()(
           currentRound: newRound,
           roundStartTime: Date.now(),
           phase: GamePhase.ROUND_ACTIVE,
-          playerAnswers: new Map(),
+          playerAnswers: {},
           stoppedBy: undefined,
           roundEndTime: undefined,
         };

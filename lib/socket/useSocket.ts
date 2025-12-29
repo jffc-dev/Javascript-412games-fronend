@@ -23,135 +23,171 @@ import {
   RoomInfo,
 } from '@/lib/types';
 
+// Track if game listeners are setup on the singleton
+let gameListenersSetup = false;
+
+// Setup game event listeners on socket singleton (only once globally)
+function setupGameListeners(socket: Socket) {
+  if (gameListenersSetup) {
+    console.log('[Socket] Game listeners already setup');
+    return;
+  }
+  gameListenersSetup = true;
+  
+  console.log('[Socket] Setting up game event listeners');
+
+  // Debug: log ALL events to see what's coming in
+  socket.onAny((eventName, ...args) => {
+    console.log(`[Socket DEBUG] Event received: "${eventName}"`, args);
+  });
+
+  socket.on(SOCKET_EVENTS.CONNECTED, (data: { id: string }) => {
+    console.log('[Socket] CONNECTED event:', data.id);
+    useGameStore.getState().setPlayerId(data.id);
+  });
+
+  socket.on(SOCKET_EVENTS.PLAYER_JOINED, (data: PlayerJoinedEvent) => {
+    console.log('[Socket] PLAYER_JOINED event:', data);
+    useGameStore.getState().setRoom(data.room);
+  });
+
+  socket.on(SOCKET_EVENTS.PLAYER_LEFT, (data: PlayerLeftEvent) => {
+    console.log('[Socket] PLAYER_LEFT event:', data);
+    useGameStore.getState().setRoom(data.room);
+  });
+
+  socket.on(SOCKET_EVENTS.PLAYER_READY_CHANGED, (data: PlayerReadyChangedEvent) => {
+    console.log('[Socket] PLAYER_READY_CHANGED event:', data);
+    useGameStore.getState().setRoom(data.room);
+  });
+
+  socket.on(SOCKET_EVENTS.GAME_STARTED, (data: GameStartedEvent) => {
+    console.log('[Socket] GAME_STARTED event:', data);
+    useGameStore.getState().setRoom(data.room);
+    useGameStore.getState().setGamePhase('playing');
+  });
+
+  socket.on(SOCKET_EVENTS.GAME_ACTION_RECEIVED, (data: GameActionReceivedEvent) => {
+    console.log('[Socket] GAME_ACTION_RECEIVED event:', data);
+    useGameStore.getState().handleGameAction(data);
+  });
+
+  socket.on(SOCKET_EVENTS.GAME_STATE_UPDATED, (data: GameStateUpdatedEvent) => {
+    console.log('[Socket] GAME_STATE_UPDATED event:', data);
+    useGameStore.getState().setGameState(data.gameState);
+  });
+
+  socket.on(SOCKET_EVENTS.GAME_ENDED, (data: GameEndedEvent) => {
+    console.log('[Socket] GAME_ENDED event:', data);
+    useGameStore.getState().setRoom(data.room);
+    useGameStore.getState().setGamePhase('finished');
+  });
+
+  socket.on(SOCKET_EVENTS.ROOM_RESET, (data: { room: RoomInfo }) => {
+    console.log('[Socket] ROOM_RESET event:', data);
+    useGameStore.getState().setRoom(data.room);
+    useGameStore.getState().setGamePhase('lobby');
+  });
+
+  socket.on(SOCKET_EVENTS.CHAT_MESSAGE_RECEIVED, (data: ChatMessageReceivedEvent) => {
+    console.log('[Socket] CHAT_MESSAGE_RECEIVED event:', data);
+    useGameStore.getState().addChatMessage({
+      playerId: data.playerId,
+      username: data.username,
+      message: data.message,
+      timestamp: data.timestamp,
+    });
+  });
+
+  socket.on(SOCKET_EVENTS.KICKED, (data: KickedEvent) => {
+    console.log('[Socket] KICKED event:', data);
+    useGameStore.getState().reset();
+  });
+
+  socket.on(SOCKET_EVENTS.PLAYER_KICKED, (data: PlayerKickedEvent) => {
+    console.log('[Socket] PLAYER_KICKED event:', data);
+    useGameStore.getState().setRoom(data.room);
+  });
+
+  console.log('[Socket] All game event listeners setup complete');
+}
+
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Setup event listeners - use getState() to avoid stale closures
-  const setupEventListeners = useCallback((socket: Socket) => {
-    console.log('Setting up event listeners, socket connected:', socket.connected);
+  // Setup component-specific connection state listeners
+  useEffect(() => {
+    const socket = getSocket();
     
-    // Remove all listeners and re-add them fresh
-    socket.removeAllListeners();
+    // Initialize state from current socket status
+    setIsConnected(socket.connected);
     
-    socket.on('connect', () => {
-      console.log('Socket reconnected');
+    const onConnect = () => {
+      console.log('[useSocket] Component: socket connected');
       setIsConnected(true);
       setError(null);
-    });
-
-    socket.on('disconnect', () => {
+    };
+    
+    const onDisconnect = () => {
+      console.log('[useSocket] Component: socket disconnected');
       setIsConnected(false);
-    });
-
-    socket.on('connect_error', (err) => {
+    };
+    
+    const onConnectError = (err: Error) => {
+      console.error('[useSocket] Component: socket connect error:', err);
       setError(`Connection error: ${err.message}`);
       setIsConnected(false);
-    });
-
-    // Use onAny to handle all events since specific listeners aren't working
-    socket.onAny((eventName: string, data: unknown) => {
-      console.log('📨 Received event:', eventName, data);
-      
-      const store = useGameStore.getState();
-      
-      switch (eventName) {
-        case SOCKET_EVENTS.CONNECTED:
-          store.setPlayerId((data as { id: string }).id);
-          break;
-          
-        case SOCKET_EVENTS.PLAYER_JOINED:
-          console.log('Processing PLAYER_JOINED:', data);
-          store.setRoom((data as PlayerJoinedEvent).room);
-          break;
-          
-        case SOCKET_EVENTS.PLAYER_LEFT:
-          store.setRoom((data as PlayerLeftEvent).room);
-          break;
-          
-        case SOCKET_EVENTS.PLAYER_READY_CHANGED:
-          store.setRoom((data as PlayerReadyChangedEvent).room);
-          break;
-          
-        case SOCKET_EVENTS.GAME_STARTED:
-          store.setRoom((data as GameStartedEvent).room);
-          store.setGamePhase('playing');
-          break;
-          
-        case SOCKET_EVENTS.GAME_ACTION_RECEIVED:
-          store.handleGameAction(data as GameActionReceivedEvent);
-          break;
-          
-        case SOCKET_EVENTS.GAME_STATE_UPDATED:
-          store.setGameState((data as GameStateUpdatedEvent).gameState);
-          break;
-          
-        case SOCKET_EVENTS.GAME_ENDED:
-          store.setRoom((data as GameEndedEvent).room);
-          store.setGamePhase('finished');
-          break;
-          
-        case SOCKET_EVENTS.ROOM_RESET:
-          store.setRoom((data as { room: RoomInfo }).room);
-          store.setGamePhase('lobby');
-          break;
-          
-        case SOCKET_EVENTS.CHAT_MESSAGE_RECEIVED: {
-          const chatData = data as ChatMessageReceivedEvent;
-          store.addChatMessage({
-            playerId: chatData.playerId,
-            username: chatData.username,
-            message: chatData.message,
-            timestamp: chatData.timestamp,
-          });
-          break;
-        }
-          
-        case SOCKET_EVENTS.KICKED:
-          store.reset();
-          setError((data as KickedEvent).message);
-          break;
-          
-        case SOCKET_EVENTS.PLAYER_KICKED:
-          store.setRoom((data as PlayerKickedEvent).room);
-          break;
-      }
-    });
+    };
     
-    console.log('All event listeners set up via onAny');
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
+    
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
+    };
   }, []);
 
   // Connect to socket
   const connect = useCallback(async () => {
-    console.log('connect() called, isConnecting:', isConnecting, 'isConnected:', isConnected);
-    if (isConnecting || isConnected) return;
+    if (isConnecting) {
+      console.log('[useSocket] Already connecting...');
+      return;
+    }
+
+    const socket = getSocket();
+    socketRef.current = socket;
+    
+    // Setup game listeners (idempotent - only runs once)
+    setupGameListeners(socket);
+    
+    // If already connected, just update state
+    if (socket.connected) {
+      console.log('[useSocket] Socket already connected');
+      setIsConnected(true);
+      return;
+    }
 
     setIsConnecting(true);
     setError(null);
 
     try {
-      const socket = getSocket();
-      console.log('Got socket instance, connected:', socket.connected);
-      socketRef.current = socket;
-      
-      // Connect first
-      console.log('Calling connectSocket()...');
+      console.log('[useSocket] Connecting...');
       await connectSocket();
-      console.log('connectSocket() resolved, socket connected:', socket.connected);
-      
-      // Setup listeners AFTER connection is established
-      setupEventListeners(socket);
-      
+      console.log('[useSocket] Connected successfully');
       setIsConnected(true);
     } catch (err) {
-      console.error('Connection error:', err);
+      console.error('[useSocket] Connection error:', err);
       setError(err instanceof Error ? err.message : 'Failed to connect');
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnecting, isConnected, setupEventListeners]);
+  }, [isConnecting]);
 
   // Disconnect from socket
   const disconnect = useCallback(() => {
@@ -223,7 +259,6 @@ export const useSocket = () => {
   }, [emit]);
 
   const setReady = useCallback(async (isReady: boolean) => {
-    console.log('data')
     const room = useGameStore.getState().room;
     if (!room) return;
 
@@ -269,9 +304,9 @@ export const useSocket = () => {
     }
   }, [emit]);
 
-  const endGame = useCallback(async (winner?: string, results?: unknown) => {
+  const endGame = useCallback(async () => {
     try {
-      await emit(SOCKET_EVENTS.END_GAME, { winner, results });
+      await emit(SOCKET_EVENTS.END_GAME);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to end game');
       throw err;
@@ -300,22 +335,16 @@ export const useSocket = () => {
   }, [emit]);
 
   const kickPlayer = useCallback(async (playerId: string) => {
+    const room = useGameStore.getState().room;
+    if (!room) return;
+
     try {
-      await emit(SOCKET_EVENTS.KICK_PLAYER, { playerId });
+      await emit(SOCKET_EVENTS.KICK_PLAYER, { roomCode: room.code, playerId });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to kick player');
       throw err;
     }
   }, [emit]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-      }
-    };
-  }, []);
 
   return {
     isConnected,
@@ -334,6 +363,5 @@ export const useSocket = () => {
     resetRoom,
     sendChatMessage,
     kickPlayer,
-    clearError: () => setError(null),
   };
 };

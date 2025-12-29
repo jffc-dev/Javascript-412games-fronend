@@ -1,16 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button, Input, Card } from '@/components/ui';
 import { useSocket } from '@/lib/socket';
 
 interface HomeViewProps {
   onRoomJoined: () => void;
+  gameName?: string;
+  gameEmoji?: string;
 }
 
-export const HomeView = ({ onRoomJoined }: HomeViewProps) => {
-  const router = useRouter();
+export const HomeView = ({ 
+  onRoomJoined, 
+  gameName = 'Stop!', 
+  gameEmoji = '🛑' 
+}: HomeViewProps) => {
   const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
   const [username, setUsername] = useState('');
   const [roomName, setRoomName] = useState('');
@@ -19,12 +23,12 @@ export const HomeView = ({ onRoomJoined }: HomeViewProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { isConnected, isConnecting, connect, createRoom, joinRoom, error: socketError } = useSocket();
+  const { isConnected, isConnecting, connect, createRoom, joinRoom } = useSocket();
 
   const handleConnect = async () => {
     try {
       await connect();
-    } catch (err) {
+    } catch {
       setError('Failed to connect to server');
     }
   };
@@ -90,7 +94,7 @@ export const HomeView = ({ onRoomJoined }: HomeViewProps) => {
           <div className="space-y-8">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                🛑 Stop!
+                {gameEmoji} {gameName}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 The classic word game (Tutti Frutti)
@@ -176,8 +180,8 @@ export const HomeView = ({ onRoomJoined }: HomeViewProps) => {
               />
             </div>
 
-            {(error || socketError) && (
-              <p className="text-red-500 text-sm">{error || socketError}</p>
+            {error && (
+              <p className="text-red-500 text-sm">{error}</p>
             )}
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
@@ -225,8 +229,8 @@ export const HomeView = ({ onRoomJoined }: HomeViewProps) => {
               className="text-center text-2xl tracking-widest uppercase"
             />
 
-            {(error || socketError) && (
-              <p className="text-red-500 text-sm">{error || socketError}</p>
+            {error && (
+              <p className="text-red-500 text-sm">{error}</p>
             )}
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
